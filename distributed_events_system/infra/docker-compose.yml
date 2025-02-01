@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: events
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres_init.sql:/docker-entrypoint-initdb.d/postgres_init.sql
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./localstack_init.sh:/etc/localstack/init/ready.d/localstack_init.sh
+
+  api_service:
+    build: ../services/api_service
+    environment:
+      PORT: 3000
+      POSTGRES_URL: postgres://app:app@postgres:5432/events
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: http://localstack:4566
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/events_queue
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - localstack
+
+  worker_service:
+    build: ../services/worker_service
+    environment:
+      POSTGRES_URL: postgres://app:app@postgres:5432/events
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: http://localstack:4566
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/events_queue
+      WEBHOOK_BASE_URL: http://host.docker.internal:4000/webhooks
+      REDIS_URL: redis://redis:6379
+      METRICS_PORT: 9100
+    depends_on:
+      - postgres
+      - localstack
+      - redis
+
+volumes:
+  postgres_data:
