@@ -1,0 +1,8 @@
+{
+  "name": "distributed_events_system",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
